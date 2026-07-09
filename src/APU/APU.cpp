@@ -5,9 +5,6 @@
 #include "Cartridge.h"
 #include "Log.h"
 
-#include <SFML/Audio/SoundStream.hpp>
-#include <SFML/Config.hpp>
-#include <SFML/System/Time.hpp>
 #include <ios>
 
 using namespace std::chrono;

@@ -3,9 +3,6 @@
 #include "APU/Units.h"
 #include "Cartridge.h"
 #include "Log.h"
-#include <SFML/Audio/SoundStream.hpp>
-#include <SFML/Config.hpp>
-#include <SFML/System/Time.hpp>
 
 namespace sn
 {

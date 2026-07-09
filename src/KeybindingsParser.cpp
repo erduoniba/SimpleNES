@@ -4,6 +4,8 @@
 #include <string>
 #include <vector>
 
+#include <SFML/Window.hpp>
+
 #include "Controller.h"
 #include "Log.h"
 

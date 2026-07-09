@@ -9,45 +9,52 @@ namespace sn
 using std::chrono::high_resolution_clock;
 
 Emulator::Emulator()
-  : m_cpu(m_bus)
-  , m_audioPlayer(static_cast<int>(1.0 / apu_clock_period_s.count()))
-  , m_ppu(m_pictureBus, m_emulatorScreen)
-  , m_apu(m_audioPlayer, m_cpu.createIRQHandler(), [&](Address addr) { return DMCDMA(addr); })
-  , m_bus(m_ppu, m_apu, m_controller1, m_controller2, [&](Byte b) { OAMDMA(b); })
+  : m_core()
+  , m_audioPlayer(m_core.audioQueue(), static_cast<int>(1.0 / apu_clock_period_s.count()))
   , m_screenScale(3.f)
+  , m_p1Keys(Controller::TotalButtons, sf::Keyboard::Unknown)
+  , m_p2Keys(Controller::TotalButtons, sf::Keyboard::Unknown)
   , m_lastWakeup()
 {
-    m_ppu.setInterruptCallback([&]() { m_cpu.nmiInterrupt(); });
+}
+
+void Emulator::pollInput()
+{
+    // Push the current SFML keyboard state into both core controllers, once per frame.
+    // The core is decoupled from SFML — this function is the only translation point.
+    auto push = [](Controller& c, const std::vector<sf::Keyboard::Key>& keys) {
+        for (int b = Controller::A; b < Controller::TotalButtons; ++b)
+        {
+            auto btn     = static_cast<Controller::Buttons>(b);
+            bool pressed = keys[b] != sf::Keyboard::Unknown && sf::Keyboard::isKeyPressed(keys[b]);
+            c.setButtonState(btn, pressed);
+        }
+    };
+    push(m_core.controller(0), m_p1Keys);
+    push(m_core.controller(1), m_p2Keys);
 }
 
 void Emulator::run(std::string rom_path)
 {
-    if (!m_cartridge.loadFromFile(rom_path))
+    if (!m_core.loadROMFile(rom_path))
         return;
-
-    m_mapper = Mapper::createMapper(static_cast<Mapper::Type>(m_cartridge.getMapper()),
-                                    m_cartridge,
-                                    m_cpu.createIRQHandler(),
-                                    [&]() { m_pictureBus.updateMirroring(); });
-    if (!m_mapper)
-    {
-        LOG(Error) << "Creating Mapper failed. Probably unsupported." << std::endl;
+    if (!m_core.reset())
         return;
-    }
-
-    if (!m_bus.setMapper(m_mapper.get()) || !m_pictureBus.setMapper(m_mapper.get()))
-    {
-        return;
-    }
-
-    m_cpu.reset();
-    m_ppu.reset();
 
     m_window.create(sf::VideoMode(NESVideoWidth * m_screenScale, NESVideoHeight * m_screenScale),
                     "SimpleNES",
                     sf::Style::Titlebar | sf::Style::Close);
     m_window.setVerticalSyncEnabled(true);
-    m_emulatorScreen.create(NESVideoWidth, NESVideoHeight, m_screenScale, sf::Color::White);
+
+    // Set up the texture the PPU draws into. NES output is 256x240 RGBA8 and we upload the whole
+    // buffer once per rendered frame — cheaper than the previous 61440-vertex mesh.
+    if (!m_frameTexture.create(NESVideoWidth, NESVideoHeight))
+    {
+        LOG(Error) << "Failed to create frame texture." << std::endl;
+        return;
+    }
+    m_frameSprite.setTexture(m_frameTexture, true);
+    m_frameSprite.setScale(m_screenScale, m_screenScale);
 
     m_lastWakeup  = high_resolution_clock::now();
     m_elapsedTime = m_lastWakeup - m_lastWakeup;
@@ -94,17 +101,7 @@ void Emulator::run(std::string rom_path)
             }
             else if (pause && event.type == sf::Event::KeyReleased && event.key.code == sf::Keyboard::F3)
             {
-                for (int i = 0; i < 29781; ++i) // Around one frame
-                {
-                    // PPU
-                    m_ppu.step();
-                    m_ppu.step();
-                    m_ppu.step();
-                    // CPU
-                    m_cpu.step();
-                    // APU
-                    m_apu.step();
-                }
+                m_core.stepFrame();
             }
             else if (focus && event.type == sf::Event::KeyReleased && event.key.code == sf::Keyboard::F4)
             {
@@ -118,25 +115,22 @@ void Emulator::run(std::string rom_path)
 
         if (focus && !pause)
         {
+            pollInput();
+
             const auto now  = high_resolution_clock::now();
             m_elapsedTime  += now - m_lastWakeup;
             m_lastWakeup    = now;
 
             while (m_elapsedTime > cpu_clock_period_ns)
             {
-                // PPU
-                m_ppu.step();
-                m_ppu.step();
-                m_ppu.step();
-                // CPU
-                m_cpu.step();
-                // APU
-                m_apu.step();
-
+                m_core.stepCycle();
                 m_elapsedTime -= cpu_clock_period_ns;
             }
 
-            m_window.draw(m_emulatorScreen);
+            // Upload the freshly-rendered NES framebuffer into the GPU texture and blit it. update()
+            // takes bytes in [R,G,B,A] order and our PaletteColors are pre-packed to match on LE.
+            m_frameTexture.update(reinterpret_cast<const sf::Uint8*>(m_core.screen().pixels()));
+            m_window.draw(m_frameSprite);
             m_window.display();
         }
         else
@@ -145,26 +139,6 @@ void Emulator::run(std::string rom_path)
         }
     }
 }
-
-void Emulator::OAMDMA(Byte page)
-{
-    m_cpu.skipOAMDMACycles();
-    auto page_ptr = m_bus.getPagePtr(page);
-    if (page_ptr != nullptr)
-    {
-        m_ppu.doDMA(page_ptr);
-    }
-    else
-    {
-        LOG(Error) << "Can't get pageptr for DMA" << std::endl;
-    }
-}
-
-Byte Emulator::DMCDMA(Address addr)
-{
-    m_cpu.skipDMCDMACycles();
-    return m_bus.read(addr);
-};
 
 void Emulator::setVideoHeight(int height)
 {
@@ -188,8 +162,8 @@ void Emulator::setVideoScale(float scale)
 
 void Emulator::setKeys(std::vector<sf::Keyboard::Key>& p1, std::vector<sf::Keyboard::Key>& p2)
 {
-    m_controller1.setKeyBindings(p1);
-    m_controller2.setKeyBindings(p2);
+    m_p1Keys = p1;
+    m_p2Keys = p2;
 }
 
 void Emulator::muteAudio()

@@ -3,6 +3,9 @@
 *.depend
 *.kdev4
 .kdev*
-build/
+build*/
 .cache/
 compile_commands.json
+
+# C++ 构建iOS的framework文件
+dist/

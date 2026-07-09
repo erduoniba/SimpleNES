@@ -1,9 +1,6 @@
 #include "APU/DMC.h"
 #include "APU/Divider.h"
 #include "Cartridge.h"
-#include <SFML/Audio/SoundStream.hpp>
-#include <SFML/Config.hpp>
-#include <SFML/System/Time.hpp>
 
 namespace sn
 {

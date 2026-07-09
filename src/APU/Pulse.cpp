@@ -4,9 +4,6 @@
 
 #include "APU/Divider.h"
 #include "APU/Pulse.h"
-#include <SFML/Audio/SoundStream.hpp>
-#include <SFML/Config.hpp>
-#include <SFML/System/Time.hpp>
 #include <chrono>
 #include <cmath>
 
