@@ -84,6 +84,15 @@ final class EmulatorSession {
         sn_emulator_step_frame(handle)
     }
 
+    /// Soft-reset the currently loaded ROM (equivalent to pressing the physical NES Reset button).
+    /// Re-runs CPU/PPU reset vectors but keeps the mapper's PRG/CHR state — same behavior a real
+    /// NES has when you hit Reset without popping the cartridge. No-op with no ROM loaded.
+    @discardableResult
+    func reset() -> Bool {
+        guard hasROM else { return false }
+        return sn_emulator_reset(handle) == 0
+    }
+
     // MARK: - Video
 
     /// Pointer to the 256×240 RGBA8 framebuffer. Valid until the next call that mutates emulator
@@ -116,5 +125,36 @@ final class EmulatorSession {
     var lastError: String {
         guard let c = sn_last_error() else { return "" }
         return String(cString: c)
+    }
+
+    // MARK: - Battery-backed SRAM
+
+    /// Size in bytes of the battery-backed cartridge RAM the current ROM exposes. 0 for ROMs
+    /// without persistent memory — the emulator's iNES parser only reports non-zero here when
+    /// header byte-6 bit-1 is set, or when the mapper itself owns PRG-RAM (MMC3 → 32 KB).
+    var sramSize: Int {
+        return sn_emulator_sram_size(handle)
+    }
+
+    /// Snapshot the current SRAM as a `Data` copy. Nil when `sramSize == 0`. Copies rather than
+    /// exposing the raw pointer because the pointer's lifetime is tied to the mapper (invalid
+    /// after the next `loadROM` / `reset`) and hosts want to hand this off to `Data.write`.
+    var sramData: Data? {
+        let size = sramSize
+        guard size > 0, let p = sn_emulator_sram_data(handle) else { return nil }
+        return Data(bytes: p, count: size)
+    }
+
+    /// Overwrite the live SRAM buffer with `data`, up to `sramSize` bytes. Returns the number
+    /// of bytes actually written (clamped by the buffer size). Call this immediately after
+    /// `loadROM(...)` to restore a persisted save — the mapper is only alive post-reset, and
+    /// stepping starts on the next `stepFrame()` call.
+    @discardableResult
+    func setSRAMData(_ data: Data) -> Int {
+        guard sramSize > 0 else { return 0 }
+        return data.withUnsafeBytes { raw -> Int in
+            guard let base = raw.bindMemory(to: UInt8.self).baseAddress else { return 0 }
+            return sn_emulator_set_sram_data(handle, base, raw.count)
+        }
     }
 }

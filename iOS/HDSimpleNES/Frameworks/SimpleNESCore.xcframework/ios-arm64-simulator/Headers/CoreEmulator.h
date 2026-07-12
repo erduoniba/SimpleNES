@@ -71,6 +71,21 @@ public:
     const spsc::RingBuffer<float>& audioQueue() const { return m_audio_queue; }
     int                            audioOutputSampleRate() const { return m_audio_output_sample_rate; }
 
+    // Battery-backed cartridge RAM ("SRAM") access. Non-zero size only for ROMs whose iNES header
+    // sets the battery / persistent-memory bit (byte 6 bit 1). Hosts persist the returned buffer
+    // to disk on shutdown / background / reset and restore it after loadROM* + reset() so cartridge
+    // saves (Zelda passwords, Final Fantasy party, etc.) survive.
+    //
+    // Buffer identity is stable between reset() calls (see reset() below — the emulator preserves
+    // the bytes across mapper re-creation to mirror real-hardware behavior: pressing Reset does
+    // not clear battery memory). Pointer itself may change after reset(); always re-fetch.
+    std::size_t    sramSize() const;
+    const std::uint8_t* sramData() const;
+    // Overwrite up to sramSize() bytes into the live SRAM buffer. Returns number of bytes actually
+    // copied (0 if sramSize()==0 or data==nullptr). Intended to be called immediately after a
+    // successful reset() to restore a persisted save.
+    std::size_t    setSRAMData(const std::uint8_t* data, std::size_t len);
+
 private:
     void OAMDMA(Byte page);
     Byte DMCDMA(Address addr);

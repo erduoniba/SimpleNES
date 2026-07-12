@@ -79,6 +79,21 @@ int sn_emulator_audio_input_rate(void);
 // Output sample rate the core targets internally (currently 44100). Fixed at compile time.
 int sn_emulator_audio_output_rate(void);
 
+// Battery-backed cartridge RAM ("SRAM"). Returns 0 for ROMs without persistent memory (any header
+// byte-6 bit-1 clear ROM). Otherwise returns the size in bytes of the live SRAM buffer — 8192 for
+// most mappers, 32768 for MMC3.
+size_t sn_emulator_sram_size(sn_emulator* emu);
+
+// Pointer to the live SRAM buffer. Valid until the next call that recreates the mapper (i.e.
+// sn_emulator_reset or sn_emulator_load_rom_*). NULL if sn_emulator_sram_size() == 0.
+// Reading is safe from any thread as long as no other thread mutates the emulator.
+const uint8_t* sn_emulator_sram_data(sn_emulator* emu);
+
+// Copy up to `len` bytes into the live SRAM buffer, clamped to sn_emulator_sram_size(). Returns
+// the number of bytes actually written. Intended to be called immediately after
+// sn_emulator_reset() to restore a previously-persisted save.
+size_t sn_emulator_set_sram_data(sn_emulator* emu, const uint8_t* data, size_t len);
+
 #ifdef __cplusplus
 }
 #endif

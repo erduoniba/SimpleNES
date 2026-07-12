@@ -4,6 +4,7 @@
 #include "LastError.h"
 #include "Log.h"
 
+#include <algorithm>
 #include <sstream>
 
 namespace sn
@@ -80,6 +81,24 @@ bool CoreEmulator::reset()
         return false;
     }
 
+    // Battery-backed cartridge RAM must survive soft-reset (real hardware keeps it powered
+    // independently of the reset line). Snapshot the live SRAM before we tear the mapper down,
+    // create the fresh mapper, then splat the bytes back so games like Zelda / Final Fantasy /
+    // Kirby's Adventure don't lose their saves when the user hits the Reset button.
+    std::vector<std::uint8_t> sram_snapshot;
+    if (m_mapper)
+    {
+        const std::size_t sz = sramSize();
+        if (sz > 0)
+        {
+            const std::uint8_t* src = sramData();
+            if (src != nullptr)
+            {
+                sram_snapshot.assign(src, src + sz);
+            }
+        }
+    }
+
     m_mapper = Mapper::createMapper(static_cast<Mapper::Type>(m_cartridge.getMapper()),
                                     m_cartridge,
                                     m_cpu.createIRQHandler(),
@@ -97,6 +116,14 @@ bool CoreEmulator::reset()
     if (!m_bus.setMapper(m_mapper.get()) || !m_pictureBus.setMapper(m_mapper.get()))
     {
         return false;
+    }
+
+    // Restore snapshotted SRAM into whatever buffer the new mapper/bus expose. If the size
+    // shrank (unlikely — same ROM re-mapped identically) we truncate; if it grew we leave the
+    // tail zero-initialized.
+    if (!sram_snapshot.empty())
+    {
+        setSRAMData(sram_snapshot.data(), sram_snapshot.size());
     }
 
     m_cpu.reset();
@@ -140,5 +167,67 @@ Byte CoreEmulator::DMCDMA(Address addr)
 {
     m_cpu.skipDMCDMACycles();
     return m_bus.read(addr);
+}
+
+// SRAM access. Priority order: mapper-owned buffer first (MMC3), MainBus-owned buffer second
+// (SxROM/CNROM/AxROM/etc. that route $6000-$7FFF through MainBus::m_extRAM).
+//
+// We gate the MainBus fallback on Cartridge::hasBatteryRAM() (the true iNES byte-6 bit-1
+// value) because MainBus unconditionally allocates 8 KB of scratch RAM for every mapper —
+// see Cartridge::hasExtendedRAM() which always returns true. Without this gate every
+// non-battery ROM would appear to have 8 KB of save state, and hosts would create empty
+// .sram files for Battle City, Super Mario Bros, etc. The mapper-owned path (MMC3) is not
+// gated: those mappers only allocate PRG-RAM when the mapper itself needs it, and MMC3's
+// 32 KB buffer is only interesting when the header battery bit is also set — but we still
+// let it through because a mapper that decides to expose SRAM is authoritative.
+std::size_t CoreEmulator::sramSize() const
+{
+    if (!m_mapper) return 0;
+    if (m_mapper->sramData() != nullptr && m_mapper->sramSize() > 0)
+    {
+        return m_mapper->sramSize();
+    }
+    if (!m_cartridge.hasBatteryRAM()) return 0;
+    return m_bus.extRAMSize();
+}
+
+const std::uint8_t* CoreEmulator::sramData() const
+{
+    if (!m_mapper) return nullptr;
+    if (const std::uint8_t* mp = m_mapper->sramData())
+    {
+        if (m_mapper->sramSize() > 0) return mp;
+    }
+    if (!m_cartridge.hasBatteryRAM()) return nullptr;
+    return m_bus.extRAMData();
+}
+
+std::size_t CoreEmulator::setSRAMData(const std::uint8_t* data, std::size_t len)
+{
+    if (!m_mapper || data == nullptr || len == 0) return 0;
+
+    // Prefer the mapper-owned buffer if it exists.
+    if (Byte* mp = m_mapper->sramData())
+    {
+        const std::size_t sz = m_mapper->sramSize();
+        if (sz > 0)
+        {
+            const std::size_t n = len < sz ? len : sz;
+            std::copy(data, data + n, mp);
+            return n;
+        }
+    }
+    if (!m_cartridge.hasBatteryRAM()) return 0;
+    if (Byte* bp = m_bus.extRAMData())
+    {
+        const std::size_t sz = m_bus.extRAMSize();
+        if (sz > 0)
+        {
+            const std::size_t n = len < sz ? len : sz;
+            std::copy(data, data + n, bp);
+            return n;
+        }
+    }
+    return 0;
 }
 }

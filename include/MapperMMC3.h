@@ -20,6 +20,12 @@ public:
 
     void               scanlineIRQ();
 
+    // MMC3's PRG-RAM lives inside the mapper (not on the bus), so expose it to the host for
+    // battery-save snapshotting. See Mapper::sramData() base contract.
+    Byte*              sramData() override { return m_prgRam.data(); }
+    const Byte*        sramData() const override { return m_prgRam.data(); }
+    std::size_t        sramSize() const override { return m_prgRam.size(); }
+
 private:
     // Control variables
     uint32_t                  m_targetRegister;

@@ -25,6 +25,12 @@ public:
     Byte                     getMapper();
     Byte                     getNameTableMirroring();
     bool                     hasExtendedRAM();
+    // iNES header byte-6 bit-1 as parsed at load time. "Battery-backed RAM present at
+    // $6000-$7FFF" — the real cartridge-persistent-memory flag, as distinct from
+    // hasExtendedRAM() which is always-true because some ROMs mis-set the bit and the
+    // emulator has no cost to unconditionally allocating an 8 KB scratch page. Hosts
+    // gating save-file creation should read this one.
+    bool                     hasBatteryRAM() const { return m_extendedRAM; }
 
 private:
     // IEEE 802.3 reflected CRC32. Used for the known-bad-header override table in loadFromMemory.

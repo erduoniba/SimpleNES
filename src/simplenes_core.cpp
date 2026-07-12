@@ -118,3 +118,21 @@ extern "C" const char* sn_last_error(void)
 {
     return sn::getLastErrorCStr();
 }
+
+extern "C" size_t sn_emulator_sram_size(sn_emulator* emu)
+{
+    if (!emu) return 0;
+    return emu->inner.sramSize();
+}
+
+extern "C" const uint8_t* sn_emulator_sram_data(sn_emulator* emu)
+{
+    if (!emu) return nullptr;
+    return emu->inner.sramData();
+}
+
+extern "C" size_t sn_emulator_set_sram_data(sn_emulator* emu, const uint8_t* data, size_t len)
+{
+    if (!emu || !data || len == 0) return 0;
+    return emu->inner.setSRAMData(data, len);
+}

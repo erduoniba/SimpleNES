@@ -43,6 +43,14 @@ public:
     bool        setMapper(Mapper* mapper);
     const Byte* getPagePtr(Byte page);
 
+    // Access the CPU-space $6000–$7FFF cartridge RAM. Non-empty only when the current mapper
+    // reports hasExtendedRAM() true AND does NOT own its own PRG-RAM (Mapper::sramData() ==
+    // nullptr). Hosts snapshotting battery memory should prefer the mapper's own buffer when
+    // available; this fallback covers SxROM/CNROM/AxROM/etc. that route $6000 writes here.
+    Byte*       extRAMData() { return m_extRAM.empty() ? nullptr : m_extRAM.data(); }
+    const Byte* extRAMData() const { return m_extRAM.empty() ? nullptr : m_extRAM.data(); }
+    std::size_t extRAMSize() const { return m_extRAM.size(); }
+
 private:
     std::vector<Byte>         m_RAM;
     std::vector<Byte>         m_extRAM;

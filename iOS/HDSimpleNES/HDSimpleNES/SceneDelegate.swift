@@ -13,16 +13,32 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
 
   func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options connectionOptions: UIScene.ConnectionOptions) {
-    // Storyboard sets ViewController as the root, but we want a nav bar so the "Open" bar-button
-    // item renders. Build the window ourselves, wrap the storyboard's initial VC in a nav
-    // controller, and drop it in.
+    // App root is the player. The game library is a modal sheet the player VC presents on
+    // demand — see ViewController.openLibrary().
+    //
+    // On cold launch we try to restore whatever the user was playing last time via
+    // Prefs.lastPlayedHash → GameLibrary.entry(withHash:) → romURL → Data. Any missing link
+    // (never played, ROM deleted from library, on-disk file moved out by another app) just
+    // leaves the player in its no-ROM state; ViewController.viewDidAppear will then auto-open
+    // the library sheet so the user has somewhere to go.
     guard let windowScene = (scene as? UIWindowScene) else { return }
 
-    let sb = UIStoryboard(name: "Main", bundle: nil)
-    guard let root = sb.instantiateInitialViewController() else { return }
+    let player = ViewController()
 
-    let nav = UINavigationController(rootViewController: root)
+    if let hash = Prefs.lastPlayedHash {
+        let library = GameLibrary()
+        if let entry = library.entry(withHash: hash),
+           let data = try? Data(contentsOf: library.romURL(for: entry)) {
+            player.preloadedROMData = data
+            player.preloadedROMTitle = entry.displayName
+        } else {
+            // Pointer is stale (ROM was deleted or moved). Wipe it so we don't retry on every
+            // launch; the auto-present will kick in and the user picks fresh.
+            Prefs.clearLastPlayedHash()
+        }
+    }
 
+    let nav = UINavigationController(rootViewController: player)
     let w = UIWindow(windowScene: windowScene)
     w.rootViewController = nav
     w.makeKeyAndVisible()

@@ -66,6 +66,23 @@ int main(int argc, char** argv)
     printf("Framebuffer XOR checksum: 0x%08x\n", sum);
     printf("First pixel (RGBA bytes): 0x%08x\n", fb[0]);
 
+    // SRAM round-trip smoke: write a signature, soft-reset, verify it survived. Only meaningful
+    // for battery-backed ROMs — for others sn_emulator_sram_size returns 0 and this section is a
+    // no-op.
+    const size_t sram_sz = sn_emulator_sram_size(emu);
+    printf("SRAM size: %zu bytes\n", sram_sz);
+    if (sram_sz >= 8)
+    {
+        uint8_t signature[8] = {0xDE, 0xAD, 0xBE, 0xEF, 0xCA, 0xFE, 0xF0, 0x0D};
+        size_t wrote = sn_emulator_set_sram_data(emu, signature, 8);
+        printf("SRAM write %zu bytes\n", wrote);
+        sn_emulator_reset(emu);
+        const uint8_t* after = sn_emulator_sram_data(emu);
+        bool ok = (after != nullptr);
+        for (int i = 0; i < 8 && ok; ++i) ok = (after[i] == signature[i]);
+        printf("SRAM survives reset: %s\n", ok ? "YES" : "NO");
+    }
+
     sn_emulator_destroy(emu);
     printf("OK\n");
     return 0;
