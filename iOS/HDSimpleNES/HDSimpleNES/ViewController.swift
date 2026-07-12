@@ -48,15 +48,51 @@ class ViewController: UIViewController {
     /// Saves fire on background (didEnterBackground), reset (before session.reset), and app
     /// termination (willTerminate). Loads fire immediately after `session.loadROM`.
     private let sramStore = SRAMStore()
-    /// User-initiated pause via the toolbar button. Distinct from app-backgrounding pause — this
-    /// one persists until the user hits the button again, even after foreground/background cycles.
+    /// Tap-to-pause state: user tapped the game area to freeze the frame. Distinct from the
+    /// background-triggered pause in `appDidEnterBackground` — this one survives foreground
+    /// returns (locking the phone while paused stays paused after unlock).
     private var isPausedByUser = false
-    private var pauseButton: UIBarButtonItem?
-
     // MARK: - Views
 
     private var metalView: MetalFramebufferView!
     private var gamepadView: TouchGamepadView!
+    /// Semi-transparent overlay shown over the frozen game frame when paused. Centered play icon
+    /// on a dark round pill so the user immediately reads "tap to resume." Not part of the touch
+    /// gamepad — it's a purely visual affordance; taps pass through to the metalView's tap
+    /// recognizer via `isUserInteractionEnabled = false`.
+    private let pauseOverlay: UIView = {
+        let container = UIView()
+        container.translatesAutoresizingMaskIntoConstraints = false
+        container.backgroundColor = UIColor.black.withAlphaComponent(0.35)
+        container.isHidden = true
+        container.isUserInteractionEnabled = false
+
+        let badge = UIView()
+        badge.translatesAutoresizingMaskIntoConstraints = false
+        badge.backgroundColor = UIColor.black.withAlphaComponent(0.55)
+        badge.layer.cornerRadius = 36
+        container.addSubview(badge)
+
+        let icon = UIImageView(image: UIImage(systemName: "play.fill"))
+        icon.translatesAutoresizingMaskIntoConstraints = false
+        icon.tintColor = .white
+        icon.contentMode = .scaleAspectFit
+        badge.addSubview(icon)
+
+        NSLayoutConstraint.activate([
+            badge.centerXAnchor.constraint(equalTo: container.centerXAnchor),
+            badge.centerYAnchor.constraint(equalTo: container.centerYAnchor),
+            badge.widthAnchor.constraint(equalToConstant: 72),
+            badge.heightAnchor.constraint(equalToConstant: 72),
+            icon.centerXAnchor.constraint(equalTo: badge.centerXAnchor),
+            // Nudge the triangle a hair to the right — play.fill's optical center sits left of
+            // its bounding box, so a naive centerX makes it look off-center to the eye.
+            icon.centerYAnchor.constraint(equalTo: badge.centerYAnchor),
+            icon.widthAnchor.constraint(equalToConstant: 30),
+            icon.heightAnchor.constraint(equalToConstant: 30),
+        ])
+        return container
+    }()
     private let statusLabel: UILabel = {
         let l = UILabel()
         l.translatesAutoresizingMaskIntoConstraints = false
@@ -73,7 +109,7 @@ class ViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .systemBackground
-        title = "SimpleNES"
+        title = "SimpleHappy"
 
         // Emulator core — everything else assumes this exists.
         guard let s = EmulatorSession() else {
@@ -147,9 +183,8 @@ class ViewController: UIViewController {
         // viewDidAppear also fires on foreground return, but only if the VC is on screen. Being
         // explicit here means we're correct even if the VC is presented modally or covered.
         startDisplayLink()
-        // Honor the user-pause state — if the user paused before backgrounding, keep the game
-        // paused. Otherwise they hit "pause", locked the phone, unlocked, and their pause got
-        // silently undone. Only auto-resume audio when we weren't user-paused.
+        // Only auto-resume audio if the user hadn't manually paused before backgrounding —
+        // otherwise unlocking the phone would silently undo their tap-pause.
         if !isPausedByUser {
             audioEngine?.resume()
         }
@@ -218,6 +253,16 @@ class ViewController: UIViewController {
         view.addSubview(gamepadView)
         view.addSubview(statusLabel)
 
+        // Pause overlay pinned to metalView — scales with the picture in both orientations and
+        // never obscures the touch gamepad. Behind the tap gesture; taps pass through.
+        metalView.addSubview(pauseOverlay)
+        NSLayoutConstraint.activate([
+            pauseOverlay.leadingAnchor.constraint(equalTo: metalView.leadingAnchor),
+            pauseOverlay.trailingAnchor.constraint(equalTo: metalView.trailingAnchor),
+            pauseOverlay.topAnchor.constraint(equalTo: metalView.topAnchor),
+            pauseOverlay.bottomAnchor.constraint(equalTo: metalView.bottomAnchor),
+        ])
+
         let g = view.safeAreaLayoutGuide
         let aspect = CGFloat(session.frameWidth) / CGFloat(session.frameHeight)  // 256/240 ≈ 1.0667
 
@@ -277,6 +322,14 @@ class ViewController: UIViewController {
         ]
 
         applyLayoutForCurrentSize()
+
+        // Tap the game picture to pause/resume. Attached to metalView (not the whole view) so
+        // taps on the touch gamepad still reach the buttons — in landscape the gamepad overlays
+        // the picture and its buttons hit-test first, so only taps landing on the transparent
+        // gaps between buttons will toggle pause. That's the intended feel.
+        metalView.isUserInteractionEnabled = true
+        let tap = UITapGestureRecognizer(target: self, action: #selector(handleGameAreaTap))
+        metalView.addGestureRecognizer(tap)
     }
 
     /// Which constraint set is currently installed. Nil until first apply.
@@ -336,9 +389,8 @@ class ViewController: UIViewController {
     }
 
     private func setupNavigationBar() {
-        // Right side: Library (rightmost, primary escape hatch) + Pause + Theme picker. The
-        // library button is this VC's ONLY entry into the game list — no back button, no push,
-        // no separate root. We're the app's root; the list is a sheet we own and dismiss.
+        // Left: Library — the app's only ROM entry point. We're the root VC; the list is a sheet
+        // we own and dismiss.
         let libraryItem = UIBarButtonItem(
             image: UIImage(systemName: "list.bullet"),
             style: .plain,
@@ -346,40 +398,37 @@ class ViewController: UIViewController {
             action: #selector(openLibrary)
         )
         libraryItem.accessibilityLabel = "游戏列表"
+        navigationItem.leftBarButtonItem = libraryItem
 
-        let pauseItem = UIBarButtonItem(
-            image: UIImage(systemName: "pause.fill"),
+        // Right: Settings — theme selection and future preferences live behind this gear. Kept
+        // as the only right-hand item on purpose: fewer taps to misfire during gameplay.
+        let settingsItem = UIBarButtonItem(
+            image: UIImage(systemName: "gearshape"),
             style: .plain,
             target: self,
-            action: #selector(togglePause)
+            action: #selector(openSettings)
         )
-        pauseItem.accessibilityLabel = "Pause"
-        self.pauseButton = pauseItem
+        settingsItem.accessibilityLabel = "设置"
+        navigationItem.rightBarButtonItem = settingsItem
+    }
 
-        // Theme picker — palette icon (paintpalette.fill) opens an action sheet listing every
-        // theme in the catalog with a checkmark on the current one. Kept in the right group so
-        // both "game-controls" style items live on the same side.
-        let themeItem = UIBarButtonItem(
-            image: UIImage(systemName: "paintpalette.fill"),
-            style: .plain,
-            target: self,
-            action: #selector(openThemePicker)
-        )
-        themeItem.accessibilityLabel = "外观"
+    // MARK: - Settings sheet
 
-        // Rightmost first in the array — so order on screen (right-to-left): library, pause, theme.
-        navigationItem.rightBarButtonItems = [libraryItem, pauseItem, themeItem]
-
-        // Left side: Reset — behind a UIAlertController confirmation so a fat-finger tap doesn't
-        // nuke a run in progress.
-        let resetItem = UIBarButtonItem(
-            image: UIImage(systemName: "arrow.counterclockwise"),
-            style: .plain,
-            target: self,
-            action: #selector(resetROM)
-        )
-        resetItem.accessibilityLabel = "Reset"
-        navigationItem.leftBarButtonItem = resetItem
+    /// Present the settings screen as a `.pageSheet` modal. Currently the only setting is theme
+    /// selection, but the sheet is set up as a `UITableViewController` so adding rows (sound
+    /// toggle, controller mapping, ...) later is one section append rather than a rewrite.
+    @objc private func openSettings() {
+        let settings = SettingsViewController(style: .insetGrouped)
+        settings.onThemeChanged = { [weak self] theme in
+            self?.applyTheme(theme)
+        }
+        let nav = UINavigationController(rootViewController: settings)
+        nav.modalPresentationStyle = .pageSheet
+        if let sheet = nav.sheetPresentationController {
+            sheet.detents = [.medium(), .large()]
+            sheet.prefersGrabberVisible = true
+        }
+        present(nav, animated: true)
     }
 
     // MARK: - Theme
@@ -389,88 +438,9 @@ class ViewController: UIViewController {
     /// across launches. Background stays system default — themes only skin the buttons.
     ///
     /// Safe to call mid-game — the emulator core doesn't know or care. Metal view is untouched.
-    private func applyTheme(_ theme: GamepadTheme) {
+    fileprivate func applyTheme(_ theme: GamepadTheme) {
         gamepadView.applyTheme(theme)
         Prefs.setSelectedTheme(theme.id)
-    }
-
-    /// Action-sheet picker. Lists every theme in `GamepadTheme.all` with a checkmark on the
-    /// currently selected one (looked up from Prefs — same source-of-truth as cold launch).
-    /// Uses `.actionSheet` on iPhone; iPad needs `popoverPresentationController.barButtonItem`
-    /// to anchor the popover (otherwise it crashes with "must supply source view").
-    @objc private func openThemePicker() {
-        let currentID = Prefs.selectedTheme ?? GamepadTheme.all[0].id
-        let alert = UIAlertController(title: "按键样式", message: nil, preferredStyle: .actionSheet)
-
-        for theme in GamepadTheme.all {
-            let action = UIAlertAction(title: theme.displayName, style: .default) { [weak self] _ in
-                self?.applyTheme(theme)
-            }
-            if theme.id == currentID {
-                // System checkmark on the currently active theme so the user always knows what
-                // they're already using — avoids the "did my tap register?" feedback loop.
-                action.setValue(true, forKey: "checked")
-            }
-            alert.addAction(action)
-        }
-        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
-
-        // iPad popover anchor. On iPhone this is a no-op (the anchor properties are ignored for
-        // action sheets on compact horizontal size classes) but it prevents a crash on iPad.
-        if let popover = alert.popoverPresentationController {
-            popover.barButtonItem = navigationItem.rightBarButtonItems?.last
-        }
-        present(alert, animated: true)
-    }
-
-    // MARK: - Pause / Reset
-
-    @objc private func togglePause() {
-        guard session.hasROM else { return }
-        isPausedByUser.toggle()
-
-        // Only the audio engine needs an explicit poke — the display link keeps ticking but
-        // `tick()` skips the emulator step when paused, so the last framebuffer stays on screen.
-        // Stopping audio too avoids a tight loop pumping zeros through the source node.
-        if isPausedByUser {
-            audioEngine?.pause()
-            pauseButton?.image = UIImage(systemName: "play.fill")
-            pauseButton?.accessibilityLabel = "Resume"
-            statusLabel.text = "paused"
-        } else {
-            audioEngine?.resume()
-            pauseButton?.image = UIImage(systemName: "pause.fill")
-            pauseButton?.accessibilityLabel = "Pause"
-            statusLabel.text = "running"
-        }
-    }
-
-    @objc private func resetROM() {
-        guard session.hasROM else { return }
-        // Reset yanks the player out of whatever they were doing — always confirm.
-        let alert = UIAlertController(
-            title: "Reset ROM?",
-            message: "Any unsaved progress will be lost.",
-            preferredStyle: .alert
-        )
-        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
-        alert.addAction(UIAlertAction(title: "Reset", style: .destructive) { [weak self] _ in
-            guard let self = self else { return }
-            // Flush current SRAM before resetting — the core preserves battery RAM across
-            // reset() by design (real hardware behavior), but the user is asking to restart the
-            // game, and their in-game save should survive that restart. Snapshot now so a crash
-            // during reset() doesn't leave the disk copy stale.
-            self.sramStore.saveFromSession(self.session)
-            if self.session.reset() {
-                // Coming out of a paused state? Snap back to running so the user isn't surprised
-                // by the game not moving after reset.
-                if self.isPausedByUser { self.togglePause() }
-                self.statusLabel.text = "reset"
-            } else {
-                self.statusLabel.text = "reset failed"
-            }
-        })
-        present(alert, animated: true)
     }
 
     // MARK: - Input
@@ -548,11 +518,49 @@ class ViewController: UIViewController {
     @objc private func tick() {
         // Skip work until we have a ROM — the Metal view will keep presenting whatever texture
         // is already on the GPU (typically the last frame or black). Also skip while the user
-        // has explicitly paused via the toolbar button; the last frame stays on screen.
+        // has tapped the game area to pause; the last frame stays on screen.
         if session.hasROM && !isPausedByUser {
             session.stepFrame()
         }
         metalView.draw()
+    }
+
+    // MARK: - Tap-to-pause
+
+    /// Tap anywhere on the game picture to toggle pause/resume. Only registered on `metalView`
+    /// so taps on the gamepad area still go to the touch controls (in landscape the gamepad
+    /// overlays the picture — this handler sits BEHIND it, so button touches win via the normal
+    /// hit-test order and only taps on the transparent gaps toggle pause).
+    @objc private func handleGameAreaTap() {
+        guard session.hasROM else { return }
+        isPausedByUser.toggle()
+        if isPausedByUser {
+            audioEngine?.pause()
+            statusLabel.text = "paused — 点击画面继续"
+            showPauseOverlay(true)
+        } else {
+            audioEngine?.resume()
+            statusLabel.text = title ?? "running"
+            showPauseOverlay(false)
+        }
+    }
+
+    /// Fade the play-icon overlay in/out. Kept short (0.15s) so it feels like a status indicator,
+    /// not a scene transition.
+    private func showPauseOverlay(_ show: Bool) {
+        if show {
+            pauseOverlay.alpha = 0
+            pauseOverlay.isHidden = false
+            UIView.animate(withDuration: 0.15) { [weak self] in
+                self?.pauseOverlay.alpha = 1
+            }
+        } else {
+            UIView.animate(withDuration: 0.15, animations: { [weak self] in
+                self?.pauseOverlay.alpha = 0
+            }, completion: { [weak self] _ in
+                self?.pauseOverlay.isHidden = true
+            })
+        }
     }
 
     // MARK: - ROM loading
@@ -585,14 +593,10 @@ class ViewController: UIViewController {
             sramStore.loadSaveIntoSession(session)
             statusLabel.text = statusName
             title = statusName
-            // Coming out of a paused state (either user pause OR the "no ROM yet" empty state)?
-            // Snap back to running so the user isn't surprised by the game not moving after they
-            // pick something from the library.
-            if isPausedByUser {
-                isPausedByUser = false
-                pauseButton?.image = UIImage(systemName: "pause.fill")
-                pauseButton?.accessibilityLabel = "Pause"
-            }
+            // Snap out of tap-pause on ROM swap — otherwise the user picks a new game from the
+            // library and it silently loads paused, which reads as "the app is broken."
+            isPausedByUser = false
+            showPauseOverlay(false)
             audioEngine?.resume()
             return true
         } else {

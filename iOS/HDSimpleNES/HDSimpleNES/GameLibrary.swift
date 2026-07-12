@@ -1,6 +1,6 @@
 //
 //  GameLibrary.swift
-//  HDSimpleNES
+//  HDSimpleHappy
 //
 //  Persistent index of imported ROMs. The user picks a `.nes` file once through the document
 //  picker; we copy the bytes into `Documents/library/<sha256>.nes` and record an entry in

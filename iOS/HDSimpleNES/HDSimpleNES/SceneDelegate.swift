@@ -1,6 +1,6 @@
 //
 //  SceneDelegate.swift
-//  HDSimpleNES
+//  HDSimpleHappy
 //
 //  Created by denglibing5 on 2026/7/9.
 //

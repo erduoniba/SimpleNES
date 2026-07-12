@@ -1,6 +1,6 @@
 //
 //  MetalFramebufferView.swift
-//  HDSimpleNES
+//  HDSimpleHappy
 //
 //  MTKView that displays the NES 256×240 RGBA8 framebuffer. The pipeline is a single fullscreen
 //  triangle sampling the source texture with nearest-neighbor filtering — right for pixel art.
@@ -96,7 +96,7 @@ final class MetalFramebufferView: MTKView {
             pdesc.colorAttachments[0].pixelFormat = colorPixelFormat
             pipeline = try device.makeRenderPipelineState(descriptor: pdesc)
         } catch {
-            NSLog("[HDSimpleNES] Metal pipeline creation failed: %@", error.localizedDescription)
+            NSLog("[HDSimpleHappy] Metal pipeline creation failed: %@", error.localizedDescription)
         }
     }
 

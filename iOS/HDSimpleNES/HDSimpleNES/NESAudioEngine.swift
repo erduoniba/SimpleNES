@@ -1,6 +1,6 @@
 //
 //  NESAudioEngine.swift
-//  HDSimpleNES
+//  HDSimpleHappy
 //
 //  AVAudioEngine host on top of the emulator's SPSC audio queue. The audio thread callback pulls
 //  raw mono float samples from the queue (produced at ~894454 Hz), runs them through a two-stage
@@ -113,7 +113,7 @@ final class NESAudioEngine {
             try ax.setCategory(.ambient, mode: .default, options: [.mixWithOthers])
             try ax.setActive(true)
         } catch {
-            NSLog("[HDSimpleNES] AVAudioSession setup failed: %@", error.localizedDescription)
+            NSLog("[HDSimpleHappy] AVAudioSession setup failed: %@", error.localizedDescription)
         }
 
         // Register once — start()/pause()/resume() may fire many times, but observation is stable
@@ -154,7 +154,7 @@ final class NESAudioEngine {
         do {
             try AVAudioSession.sharedInstance().setActive(true)
         } catch {
-            NSLog("[HDSimpleNES] AVAudioSession reactivate failed: %@", error.localizedDescription)
+            NSLog("[HDSimpleHappy] AVAudioSession reactivate failed: %@", error.localizedDescription)
         }
         startEngineIfNeeded()
     }
@@ -165,7 +165,7 @@ final class NESAudioEngine {
             engine.prepare()
             try engine.start()
         } catch {
-            NSLog("[HDSimpleNES] AVAudioEngine start failed: %@", error.localizedDescription)
+            NSLog("[HDSimpleHappy] AVAudioEngine start failed: %@", error.localizedDescription)
         }
     }
 

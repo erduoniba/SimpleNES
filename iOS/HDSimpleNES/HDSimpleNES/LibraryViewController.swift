@@ -1,6 +1,6 @@
 //
 //  LibraryViewController.swift
-//  HDSimpleNES
+//  HDSimpleHappy
 //
 //  Modal sheet presented from the player VC. Lists imported ROMs; user taps a row to switch the
 //  emulator to that ROM. Import happens here too (via UIDocumentPickerViewController), with the

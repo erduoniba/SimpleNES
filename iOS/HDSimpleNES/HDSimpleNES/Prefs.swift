@@ -1,6 +1,6 @@
 //
 //  Prefs.swift
-//  HDSimpleNES
+//  HDSimpleHappy
 //
 //  A single place for the app's small persistent settings. Currently one key: the SHA-256 hash
 //  of the ROM the user was playing when they last closed the app. SceneDelegate reads this on

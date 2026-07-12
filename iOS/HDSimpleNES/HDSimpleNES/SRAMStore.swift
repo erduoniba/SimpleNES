@@ -1,6 +1,6 @@
 //
 //  SRAMStore.swift
-//  HDSimpleNES
+//  HDSimpleHappy
 //
 //  Battery-backed cartridge RAM persistence. On real hardware the cartridge has a coin battery
 //  that keeps $6000-$7FFF alive across power cycles — that's how Zelda passwords, Final Fantasy

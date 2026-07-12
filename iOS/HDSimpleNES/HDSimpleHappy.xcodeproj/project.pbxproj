@@ -11,17 +11,17 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		B1EDE0AE2FFF32460049830A /* HDSimpleNES.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = HDSimpleNES.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		B1EDE0AE2FFF32460049830A /* HDSimpleHappy.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = HDSimpleHappy.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B1F00001000000000000A001 /* SimpleNESCore.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; path = SimpleNESCore.xcframework; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		B1EDE0C02FFF32470049830A /* Exceptions for "HDSimpleNES" folder in "HDSimpleNES" target */ = {
+		B1EDE0C02FFF32470049830A /* Exceptions for "HDSimpleNES" folder in "HDSimpleHappy" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
 			);
-			target = B1EDE0AD2FFF32460049830A /* HDSimpleNES */;
+			target = B1EDE0AD2FFF32460049830A /* HDSimpleHappy */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
@@ -29,7 +29,7 @@
 		B1EDE0B02FFF32460049830A /* HDSimpleNES */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				B1EDE0C02FFF32470049830A /* Exceptions for "HDSimpleNES" folder in "HDSimpleNES" target */,
+				B1EDE0C02FFF32470049830A /* Exceptions for "HDSimpleNES" folder in "HDSimpleHappy" target */,
 			);
 			path = HDSimpleNES;
 			sourceTree = "<group>";
@@ -60,7 +60,7 @@
 		B1EDE0AF2FFF32460049830A /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				B1EDE0AE2FFF32460049830A /* HDSimpleNES.app */,
+				B1EDE0AE2FFF32460049830A /* HDSimpleHappy.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -76,9 +76,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		B1EDE0AD2FFF32460049830A /* HDSimpleNES */ = {
+		B1EDE0AD2FFF32460049830A /* HDSimpleHappy */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = B1EDE0C12FFF32470049830A /* Build configuration list for PBXNativeTarget "HDSimpleNES" */;
+			buildConfigurationList = B1EDE0C12FFF32470049830A /* Build configuration list for PBXNativeTarget "HDSimpleHappy" */;
 			buildPhases = (
 				B1EDE0AA2FFF32460049830A /* Sources */,
 				B1EDE0AB2FFF32460049830A /* Frameworks */,
@@ -91,11 +91,11 @@
 			fileSystemSynchronizedGroups = (
 				B1EDE0B02FFF32460049830A /* HDSimpleNES */,
 			);
-			name = HDSimpleNES;
+			name = HDSimpleHappy;
 			packageProductDependencies = (
 			);
 			productName = HDSimpleNES;
-			productReference = B1EDE0AE2FFF32460049830A /* HDSimpleNES.app */;
+			productReference = B1EDE0AE2FFF32460049830A /* HDSimpleHappy.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -113,7 +113,7 @@
 					};
 				};
 			};
-			buildConfigurationList = B1EDE0A92FFF32460049830A /* Build configuration list for PBXProject "HDSimpleNES" */;
+			buildConfigurationList = B1EDE0A92FFF32460049830A /* Build configuration list for PBXProject "HDSimpleHappy" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -127,7 +127,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				B1EDE0AD2FFF32460049830A /* HDSimpleNES */,
+				B1EDE0AD2FFF32460049830A /* HDSimpleHappy */,
 			);
 		};
 /* End PBXProject section */
@@ -170,6 +170,7 @@
 				);
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = HDSimpleNES/Info.plist;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
 				INFOPLIST_KEY_UIMainStoryboardFile = Main;
@@ -185,7 +186,7 @@
 					"$(inherited)",
 					"-lc++",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.harry.HDSimpleNES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.harry.simplehappy;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				"PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]" = JDLTDev_10_12;
@@ -217,6 +218,7 @@
 				);
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = HDSimpleNES/Info.plist;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
 				INFOPLIST_KEY_UIMainStoryboardFile = Main;
@@ -232,7 +234,7 @@
 					"$(inherited)",
 					"-lc++",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.harry.HDSimpleNES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.harry.simplehappy;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				"PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]" = JDLTDev_10_12;
@@ -369,7 +371,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		B1EDE0A92FFF32460049830A /* Build configuration list for PBXProject "HDSimpleNES" */ = {
+		B1EDE0A92FFF32460049830A /* Build configuration list for PBXProject "HDSimpleHappy" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				B1EDE0C42FFF32470049830A /* Debug */,
@@ -378,7 +380,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		B1EDE0C12FFF32470049830A /* Build configuration list for PBXNativeTarget "HDSimpleNES" */ = {
+		B1EDE0C12FFF32470049830A /* Build configuration list for PBXNativeTarget "HDSimpleHappy" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				B1EDE0C22FFF32470049830A /* Debug */,

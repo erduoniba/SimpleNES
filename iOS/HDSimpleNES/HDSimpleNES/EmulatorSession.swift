@@ -1,6 +1,6 @@
 //
 //  EmulatorSession.swift
-//  HDSimpleNES
+//  HDSimpleHappy
 //
 //  Thin Swift wrapper around the SimpleNESCore C API. Owns the sn_emulator* handle for the
 //  lifetime of the instance, exposes idiomatic Swift methods, and enforces that only one Swift

@@ -1,6 +1,6 @@
 //
 //  TouchGamepadView.swift
-//  HDSimpleNES
+//  HDSimpleHappy
 //
 //  On-screen touch controls: D-Pad + A/B + Select/Start. Reports state changes through a single
 //  closure. Buttons keep a "sticky-until-touch-ends" model — press-in fires pressed=true, lift
@@ -89,8 +89,8 @@ final class TouchGamepadView: UIView {
             // and D-pad arrows.
             let fontSize: CGFloat
             switch shape {
-            case .pill, .rectangle:                              fontSize = 12
-            case .dpadArrow, .circle, .roundedSquare, .plusCross: fontSize = 18
+            case .pill, .rectangle:                                              fontSize = 12
+            case .dpadArrow, .circle, .roundedSquare, .plusCross, .stickBase, .discPad: fontSize = 18
             }
             label.font = UIFont.systemFont(ofSize: fontSize, weight: .semibold)
             label.translatesAutoresizingMaskIntoConstraints = false
@@ -204,6 +204,7 @@ final class TouchGamepadView: UIView {
             case (_, .rectangle):                      radius = 3
             case (_, .roundedSquare(let r)):           radius = r
             case (_, .plusCross):                      radius = 0   // not used — plusCross never renders as a button
+            case (_, .stickBase), (_, .discPad):       radius = 0   // not used — stick/disc use dedicated views
             }
             layer.cornerRadius = radius
 
@@ -410,10 +411,26 @@ final class TouchGamepadView: UIView {
                     style: theme.style)
             return v
 
+        case .dpadStick:
+            // Analog stick — one custom view that owns the drag surface and fans out to 4
+            // direction events (diagonals fire two). Not a regular button; can't be pressed by
+            // a discrete tap on the label — must be dragged from its center.
+            let v = AnalogStickView(theme: theme)
+            v.onDirectionChanged = { [weak self] btn, pressed in
+                self?.onButtonStateChanged?(btn, pressed)
+            }
+            return v
+
+        case .dpadDisc:
+            // Octagonal 8-way disc — hit-tests 8 sectors. Diagonals fire two adjacent direction
+            // events simultaneously so up-left presses both up AND left.
+            let v = DiscPadView(theme: theme)
+            v.onDirectionChanged = { [weak self] btn, pressed in
+                self?.onButtonStateChanged?(btn, pressed)
+            }
+            return v
+
         case .decoration(let text):
-            // Non-interactive label. Uses the theme's text color and a small semibold font —
-            // enough to render a "Nintendo" wordmark strip on a custom theme without pulling in
-            // an actual image asset. Sized/placed exactly like a button.
             let l = UILabel()
             l.text = text
             l.textAlignment = .center
@@ -423,10 +440,7 @@ final class TouchGamepadView: UIView {
             return l
 
         default:
-            // An interactive NES-input button. Every remaining Role maps 1:1 to an NESButton.
             guard let nes = nesButton(for: item.role) else {
-                // Should never happen with the current Role enum — but keep a benign fallback
-                // so a bad theme doesn't crash the app.
                 return UIView()
             }
             let btn = GamepadButton(nesButton: nes,
@@ -436,8 +450,6 @@ final class TouchGamepadView: UIView {
             btn.onStateChanged = { [weak self] b, pressed in
                 self?.onButtonStateChanged?(b, pressed)
             }
-            // If the theme includes a cross backing, the four arrow buttons on top must render
-            // transparent-idle (and drop their border) so the plus behind is what the eye sees.
             if isDpadArrow(role: item.role) && themeIncludesCrossBacking(theme) {
                 btn.forceTransparentIdle = true
                 btn.apply(theme: theme)
@@ -467,6 +479,8 @@ final class TouchGamepadView: UIView {
     }
 
     /// Map a Role to the NES input line it should drive. Returns nil for non-interactive roles.
+    /// X and Y both map to A / B respectively — the NES has only two action buttons, so the
+    /// diamond layout is a visual convention rather than four independent inputs.
     private func nesButton(for role: GamepadTheme.Role) -> NESButton? {
         switch role {
         case .dpadUp:    return .up
@@ -475,9 +489,11 @@ final class TouchGamepadView: UIView {
         case .dpadRight: return .right
         case .a:         return .a
         case .b:         return .b
+        case .x:         return .a   // X → A (diamond convention)
+        case .y:         return .b   // Y → B (diamond convention)
         case .select:    return .select
         case .start:     return .start
-        case .dpadCrossBacking, .decoration: return nil
+        case .dpadCrossBacking, .dpadStick, .dpadDisc, .decoration: return nil
         }
     }
 
@@ -490,9 +506,11 @@ final class TouchGamepadView: UIView {
         case .dpadRight: return "▶"
         case .a:         return "A"
         case .b:         return "B"
+        case .x:         return "X"
+        case .y:         return "Y"
         case .select:    return "SELECT"
         case .start:     return "START"
-        case .dpadCrossBacking, .decoration: return ""
+        case .dpadCrossBacking, .dpadStick, .dpadDisc, .decoration: return ""
         }
     }
 }

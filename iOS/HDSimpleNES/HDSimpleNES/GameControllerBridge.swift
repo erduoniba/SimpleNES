@@ -1,6 +1,6 @@
 //
 //  GameControllerBridge.swift
-//  HDSimpleNES
+//  HDSimpleHappy
 //
 //  Observes GameController.framework and forwards MFi / Xbox / DualSense button/D-pad state to
 //  the emulator. NES has 8 buttons total (D-pad + A + B + Select + Start) — everything else on
